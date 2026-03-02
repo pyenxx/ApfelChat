@@ -5,46 +5,444 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>My Chat Platform</title>
     <style>
-        body { margin: 0; padding-bottom: 3rem; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: #36393f; color: white; }
-        #form { background: #40444b; padding: 0.25rem; position: fixed; bottom: 0; left: 0; right: 0; display: flex; height: 3rem; box-sizing: border-box; backdrop-filter: blur(10px); }
-        #input { border: none; padding: 0 1rem; flex-grow: 1; border-radius: 2rem; margin: 0.25rem; background: #2f3136; color: white; }
-        #input:focus { outline: none; }
-        #form > button { background: #5865F2; border: none; padding: 0 1rem; margin: 0.25rem; border-radius: 3px; outline: none; color: #fff; cursor: pointer; }
-        #messages { list-style-type: none; margin: 0; padding: 0; }
-        #messages > li { padding: 0.5rem 1rem; }
-        #messages > li:nth-child(odd) { background: #3b3e44; }
+        /* Discord-like Theme */
+        body { margin: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #36393f; color: white; overflow: hidden; }
+        
+        /* Login Modal */
+        #login-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #2f3136; display: flex; justify-content: center; align-items: center; z-index: 1000; }
+        #login-box { background: #36393f; padding: 2rem; border-radius: 8px; text-align: center; box-shadow: 0 2px 10px 0 rgba(0,0,0,0.2); }
+        #userid-input { padding: 10px; border-radius: 4px; border: 1px solid #202225; background: #202225; color: white; width: 200px; margin-bottom: 1rem; }
+        #join-btn { padding: 10px 20px; background: #5865F2; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        #join-btn:hover { background: #4752c4; }
+
+        /* App Layout */
+        #app { display: none; width: 100vw; height: 100vh; }
+        
+        /* Sidebar */
+        #sidebar { width: 240px; background: #2f3136; display: flex; flex-direction: column; padding: 10px; }
+        .channel-header { padding: 10px; font-weight: bold; text-transform: uppercase; font-size: 12px; color: #8e9297; }
+        .channel { padding: 8px 10px; margin-bottom: 2px; border-radius: 4px; cursor: pointer; color: #8e9297; display: flex; align-items: center; }
+        .channel:hover { background: #34373c; color: #dcddde; }
+        .channel.active { background: #393c43; color: white; }
+        .channel::before { content: '#'; margin-right: 6px; font-size: 18px; color: #8e9297; }
+
+        /* Chat Area */
+        #chat-area { flex-grow: 1; display: flex; flex-direction: column; background: #36393f; }
+        #messages { flex-grow: 1; overflow-y: auto; padding: 20px; list-style-type: none; margin: 0; display: flex; flex-direction: column; gap: 10px; }
+        
+        /* Message Styling */
+        .message { display: flex; flex-direction: row; padding: 5px 0; }
+        .message:hover { background: rgba(0,0,0,0.05); }
+        .message-avatar { width: 40px; height: 40px; border-radius: 50%; margin-right: 15px; flex-shrink: 0; object-fit: cover; }
+        .message-content { display: flex; flex-direction: column; justify-content: center; }
+        .message-info { display: flex; align-items: baseline; gap: 8px; }
+        .username { font-weight: bold; color: white; }
+        .timestamp { font-size: 0.75rem; color: #72767d; }
+        .text { color: #dcddde; margin-top: 2px; }
+
+        /* Input Area */
+        #form { padding: 20px; background: #36393f; }
+        #input-container { background: #40444b; border-radius: 8px; padding: 0 15px; display: flex; align-items: center; }
+        #input { flex-grow: 1; padding: 12px 0; background: transparent; border: none; color: white; outline: none; }
+        #send-btn { background: transparent; border: none; color: #dcddde; cursor: pointer; font-weight: bold; }
+
+        /* User Bar (Bottom of Sidebar) */
+        #user-bar { margin-top: auto; background: #292b2f; padding: 10px; display: flex; align-items: center; }
+        #current-user-avatar { width: 32px; height: 32px; border-radius: 50%; margin-right: 10px; }
+        #current-username { font-weight: bold; font-size: 14px; }
+        #settings-btn { margin-left: auto; background: none; border: none; color: #b9bbbe; cursor: pointer; font-size: 18px; }
+        #settings-btn:hover { color: white; }
+
+        /* Settings Modal */
+        #settings-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 2000; justify-content: center; align-items: center; }
+        .settings-content { background: #36393f; width: 400px; padding: 20px; border-radius: 8px; position: relative; text-align: center; }
+        .close-settings { position: absolute; top: 10px; right: 15px; cursor: pointer; font-size: 24px; color: #aaa; }
+        .settings-avatar { width: 80px; height: 80px; border-radius: 50%; margin-bottom: 15px; }
+
+        /* Voice Channel */
+        .voice-channel { padding: 8px 10px; margin-bottom: 2px; border-radius: 4px; color: #8e9297; display: flex; align-items: center; justify-content: space-between; }
+        .voice-channel-name::before { content: '🔊'; margin-right: 6px; font-size: 16px; }
+        .voice-join-btn { background: #43b581; color: white; border: none; border-radius: 3px; padding: 4px 8px; cursor: pointer; font-size: 12px; }
+        .voice-join-btn.leave { background: #f04747; }
+
+        /* Voice User List */
+        .voice-user { font-size: 13px; color: #b9bbbe; padding: 4px 0; display: flex; align-items: center; }
+        .voice-user::before { content: ''; display: inline-block; width: 8px; height: 8px; border-radius: 50%; background-color: #43b581; margin-right: 8px; }
     </style>
 </head>
 <body>
-    <ul id="messages"></ul>
-    <form id="form" action="">
-        <input id="input" autocomplete="off" placeholder="Message #general" /><button>Send</button>
-    </form>
+    <!-- Login Screen -->
+    <div id="login-screen">
+        <div id="login-box">
+            <h2>Login</h2>
+            <p style="color: #aaa; font-size: 0.9rem; margin-bottom: 1rem;">Use ID 1, 2, or 3</p>
+            <input id="userid-input" type="text" placeholder="Enter User ID..." autocomplete="off" />
+            <br>
+            <button id="join-btn">Join Chat</button>
+        </div>
+    </div>
+
+    <!-- Main App -->
+    <div id="app">
+        <div id="sidebar">
+            <div class="channel-header">Text Channels</div>
+            <div class="channel active" onclick="switchChannel('general')">general</div>
+            <div class="channel" onclick="switchChannel('gaming')">gaming</div>
+            <div class="channel" onclick="switchChannel('music')">music</div>
+            <div class="channel" onclick="switchChannel('coding')">coding</div>
+
+            <div class="channel-header">Voice Channels</div>
+            <div class="voice-channel" style="flex-direction: column; align-items: stretch;">
+                <div style="display: flex; align-items: center; justify-content: space-between;">
+                    <span class="voice-channel-name">General</span>
+                    <div style="display: flex; gap: 5px;"><button id="mute-btn" class="voice-join-btn" style="display: none; background: #5865F2;">Mute</button><button id="join-voice-btn" class="voice-join-btn">Join</button></div>
+                </div>
+                <div id="voice-user-list" style="margin-top: 5px; padding-left: 10px;"></div>
+            </div>
+            
+            <div id="user-bar">
+                <img id="current-user-avatar" src="" alt="">
+                <div id="current-username"></div>
+                <button id="settings-btn" onclick="openSettings()">⚙️</button>
+            </div>
+        </div>
+        <div id="chat-area">
+            <ul id="messages"></ul>
+            <form id="form" action="">
+                <div id="input-container">
+                    <input id="input" autocomplete="off" placeholder="Message #general" />
+                    <button id="send-btn">Send</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settings-modal">
+        <div class="settings-content">
+            <span class="close-settings" onclick="closeSettings()">&times;</span>
+            <h2>My Account</h2>
+            <img id="settings-avatar-display" class="settings-avatar" src="" alt="">
+            <h3 id="settings-username-display"></h3>
+            <p style="color: #aaa;">User ID: <span id="settings-id-display"></span></p>
+        </div>
+    </div>
+
+    <div id="audio-container" style="display: none;"></div>
 
     <!-- Socket.io client library is automatically served by the server -->
     <script src="/socket.io/socket.io.js"></script>
     <script>
         var socket = io();
+        var currentUser = null; // Will hold { username, avatar, id }
+        var currentChannel = 'general';
 
-        var messages = document.getElementById('messages');
-        var form = document.getElementById('form');
-        var input = document.getElementById('input');
+        // Voice Chat State
+        var localStream = null;
+        var peerConnections = {}; // { otherSocketId: RTCPeerConnection }
+        var inVoiceChannel = false;
+        var isMuted = false;
+        const voiceChannelName = 'general-voice';
+
+        // DOM Elements
+        const loginScreen = document.getElementById('login-screen');
+        const app = document.getElementById('app');
+        const userIdInput = document.getElementById('userid-input');
+        const joinBtn = document.getElementById('join-btn');
+        const messages = document.getElementById('messages');
+        const form = document.getElementById('form');
+        const input = document.getElementById('input');
+        const joinVoiceBtn = document.getElementById('join-voice-btn');
+        const muteBtn = document.getElementById('mute-btn');
+        const audioContainer = document.getElementById('audio-container');
+
+        // Login
+        joinBtn.addEventListener('click', () => {
+            const id = userIdInput.value.trim();
+            if (id) {
+                socket.emit('login', id, (response) => {
+                    if (response.success) {
+                        currentUser = response.userData;
+                        currentUser.id = id; // Store ID as well
+                        
+                        // Update UI with user info
+                        document.getElementById('current-username').innerText = currentUser.username;
+                        document.getElementById('current-user-avatar').src = currentUser.avatar;
+                        
+                        // Update Settings UI
+                        document.getElementById('settings-username-display').innerText = currentUser.username;
+                        document.getElementById('settings-avatar-display').src = currentUser.avatar;
+                        document.getElementById('settings-id-display').innerText = id;
+
+                        loginScreen.style.display = 'none';
+                        app.style.display = 'flex';
+                        switchChannel('general');
+                    } else {
+                        alert(response.message);
+                    }
+                });
+            }
+        });
+
+        // Switch Channel
+        window.switchChannel = function(channel) {
+            currentChannel = channel;
+            
+            // Update UI
+            document.querySelectorAll('.channel').forEach(el => {
+                el.classList.remove('active');
+                if(el.innerText === channel) el.classList.add('active');
+            });
+            
+            messages.innerHTML = ''; // Clear chat
+            input.placeholder = `Message #${channel}`;
+            
+            // Tell server we joined
+            socket.emit('join channel', channel);
+        }
+
+        // Settings Functions
+        window.openSettings = function() {
+            document.getElementById('settings-modal').style.display = 'flex';
+        }
+        window.closeSettings = function() {
+            document.getElementById('settings-modal').style.display = 'none';
+        }
+
+        // --- Voice Chat Logic ---
+
+        muteBtn.addEventListener('click', () => {
+            if (localStream) {
+                isMuted = !isMuted;
+                // Toggle the audio track enabled state
+                localStream.getAudioTracks()[0].enabled = !isMuted;
+                muteBtn.innerText = isMuted ? 'Unmute' : 'Mute';
+                muteBtn.style.backgroundColor = isMuted ? '#f04747' : '#5865F2';
+            }
+        });
+
+        joinVoiceBtn.addEventListener('click', () => {
+            if (!inVoiceChannel) {
+                joinVoice();
+            } else {
+                leaveVoice();
+            }
+        });
+
+        async function joinVoice() {
+            if (!currentUser) {
+                alert('You must be logged in to join voice chat.');
+                return;
+            }
+            try {
+                localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+                
+                joinVoiceBtn.innerText = 'Leave';
+                joinVoiceBtn.classList.add('leave');
+                muteBtn.style.display = 'block'; // Show mute button
+                inVoiceChannel = true;
+
+                socket.emit('join-voice', voiceChannelName, currentUser.username);
+
+            } catch (err) {
+                console.error('Error accessing microphone:', err);
+                alert('Could not access microphone. Please check permissions.');
+            }
+        }
+
+        function leaveVoice() {
+            if (localStream) {
+                localStream.getTracks().forEach(track => track.stop());
+                localStream = null;
+            }
+
+            socket.emit('leave-voice');
+
+            for (const socketId in peerConnections) {
+                peerConnections[socketId].close();
+            }
+            peerConnections = {};
+
+            audioContainer.innerHTML = ''; // Remove all audio elements
+            
+            joinVoiceBtn.innerText = 'Join';
+            joinVoiceBtn.classList.remove('leave');
+            muteBtn.style.display = 'none'; // Hide mute button
+            muteBtn.innerText = 'Mute';
+            isMuted = false;
+            inVoiceChannel = false;
+        }
+
+        function createPeerConnection(otherSocketId, isInitiator) {
+            const pc = new RTCPeerConnection({
+                iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] // Public STUN server
+            });
+
+            peerConnections[otherSocketId] = pc;
+
+            // Add local audio tracks to the connection
+            localStream.getTracks().forEach(track => {
+                pc.addTrack(track, localStream);
+            });
+
+            // When we get a track from the other peer, add it to an audio element
+            pc.ontrack = (event) => {
+                let audio = document.getElementById(`audio-${otherSocketId}`);
+                if (!audio) {
+                    audio = document.createElement('audio');
+                    audio.id = `audio-${otherSocketId}`;
+                    audio.autoplay = true;
+                    audioContainer.appendChild(audio);
+                }
+                audio.srcObject = event.streams[0];
+            };
+
+            // Handle ICE candidates
+            pc.onicecandidate = (event) => {
+                if (event.candidate) {
+                    socket.emit('relay-ice', {
+                        to: otherSocketId,
+                        candidate: event.candidate
+                    });
+                }
+            };
+
+            // If we are the one initiating the call
+            if (isInitiator) {
+                pc.createOffer()
+                    .then(offer => pc.setLocalDescription(offer))
+                    .then(() => {
+                        socket.emit('relay-offer', {
+                            to: otherSocketId,
+                            offer: pc.localDescription
+                        });
+                    })
+                    .catch(e => console.error("Error creating offer:", e));
+            }
+
+            return pc;
+        }
+
+        // --- Voice Socket Listeners ---
+
+        function updateVoiceUserList(users) {
+            const list = document.getElementById('voice-user-list');
+            list.innerHTML = '';
+            users.forEach(user => {
+                const div = document.createElement('div');
+                div.className = 'voice-user';
+                div.innerText = user;
+                list.appendChild(div);
+            });
+        }
+
+        socket.on('voice-users-update', (data) => {
+            if (data.channel === voiceChannelName) {
+                updateVoiceUserList(data.users);
+            }
+        });
+
+        socket.on('all-voice-users', (channels) => {
+            if (channels[voiceChannelName]) {
+                updateVoiceUserList(Object.values(channels[voiceChannelName]));
+            }
+        });
+
+        socket.on('existing-voice-users', (users) => {
+            for (const socketId in users) {
+                if (socketId !== socket.id) {
+                    createPeerConnection(socketId, true); // We are the initiator
+                }
+            }
+        });
+
+        socket.on('new-voice-user', (data) => {
+            createPeerConnection(data.socketId, false); // A new user joined, we wait for their offer
+        });
+
+        socket.on('offer-received', (data) => {
+            let pc = peerConnections[data.from];
+            if (!pc) {
+                pc = createPeerConnection(data.from, false);
+            }
+            
+            pc.setRemoteDescription(new RTCSessionDescription(data.offer))
+                .then(() => pc.createAnswer())
+                .then(answer => pc.setLocalDescription(answer))
+                .then(() => {
+                    socket.emit('relay-answer', {
+                        to: data.from,
+                        answer: pc.localDescription
+                    });
+                })
+                .catch(e => console.error("Error handling offer:", e));
+        });
+
+        socket.on('answer-received', (data) => {
+            const pc = peerConnections[data.from];
+            if (pc) {
+                pc.setRemoteDescription(new RTCSessionDescription(data.answer))
+                   .catch(e => console.error("Error setting remote description from answer:", e));
+            }
+        });
+
+        socket.on('ice-candidate-received', (data) => {
+            const pc = peerConnections[data.from];
+            if (pc) {
+                pc.addIceCandidate(new RTCIceCandidate(data.candidate))
+                  .catch(e => console.error("Error adding received ICE candidate", e));
+            }
+        });
+
+        socket.on('user-left-voice', (socketId) => {
+            if (peerConnections[socketId]) {
+                peerConnections[socketId].close();
+                delete peerConnections[socketId];
+            }
+            const audioEl = document.getElementById(`audio-${socketId}`);
+            if (audioEl) {
+                audioEl.remove();
+            }
+        });
 
         // Send message to server
         form.addEventListener('submit', function(e) {
             e.preventDefault();
-            if (input.value) {
-                socket.emit('chat message', input.value);
+            if (input.value && currentUser) {
+                const msgData = {
+                    user: currentUser.username,
+                    avatar: currentUser.avatar,
+                    id: currentUser.id,
+                    text: input.value,
+                    channel: currentChannel,
+                    time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                };
+                socket.emit('chat message', msgData);
                 input.value = '';
             }
         });
 
         // Receive message from server
         socket.on('chat message', function(msg) {
-            var item = document.createElement('li');
-            item.textContent = msg;
-            messages.appendChild(item);
-            window.scrollTo(0, document.body.scrollHeight);
+            // Only show message if it belongs to current channel
+            if (msg.channel === currentChannel) {
+                const item = document.createElement('li');
+                item.className = 'message';
+                // Use a default avatar if the message history doesn't have one (for old messages)
+                const avatarSrc = msg.avatar || `https://api.dicebear.com/9.x/avataaars/svg?seed=${msg.user}`;
+                item.innerHTML = `
+                    <img class="message-avatar" src="${avatarSrc}" alt="">
+                    <div class="message-content">
+                        <div class="message-info">
+                            <span class="username">${msg.user}</span>
+                            <span class="timestamp">${msg.time}</span>
+                        </div>
+                        <div class="text">${msg.text}</div>
+                    </div>
+                `;
+                messages.appendChild(item);
+                messages.scrollTop = messages.scrollHeight;
+            }
         });
     </script>
 </body>
